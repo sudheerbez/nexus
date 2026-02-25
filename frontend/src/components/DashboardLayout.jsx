@@ -1,7 +1,7 @@
 import React from 'react';
 import { Home, Compass, User, Settings, Bell, Search } from 'lucide-react';
 
-export default function DashboardLayout({ children }) {
+export default function DashboardLayout({ children, userData }) {
     return (
         <div className="min-h-screen flex text-slate-100 font-sans">
 
