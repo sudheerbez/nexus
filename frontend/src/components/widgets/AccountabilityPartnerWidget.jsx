@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Calendar, Video, RefreshCw } from "lucide-react";
+import { runMatchAlgorithm } from '../../services/api';
+import { Users, Calendar, Video, RefreshCw, X, ExternalLink } from "lucide-react";
 
 export default function AccountabilityPartnerWidget() {
     const [partnerData, setPartnerData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showCallModal, setShowCallModal] = useState(false);
 
     const fetchPartner = () => {
         setLoading(true);
-        // This simulates a polling check to see if the Gale-Shapley match happened
-        // In a real app we'd fetch the specific match for the user.
-        // For prototype, we'll just mock the response after the trigger is successful.
         setTimeout(() => {
-            setPartnerData(null); // Initially no partner
+            setPartnerData(null);
             setLoading(false);
         }, 500);
     };
@@ -23,15 +22,8 @@ export default function AccountabilityPartnerWidget() {
     const handleRunMatch = async () => {
         setLoading(true);
         try {
-            await fetch('http://localhost:8000/api/match', { method: 'POST' });
-            // Mocking the matched response since we just ran the algorithm
-            setPartnerData({
-                name: "Alex Chen",
-                major: "CS Major",
-                score: 92,
-                meeting: "Tomorrow, 2:00 PM",
-                seed: "Alex"
-            });
+            const data = await runMatchAlgorithm();
+            setPartnerData(data);
         } catch (e) {
             console.error(e);
         } finally {
@@ -73,7 +65,10 @@ export default function AccountabilityPartnerWidget() {
                             <Calendar size={14} className="text-slate-400" />
                             <span>{partnerData.meeting}</span>
                         </div>
-                        <button className="glass-button text-xs py-1 px-3 bg-blue-500/20 hover:bg-blue-500/40 border-blue-400/30 text-blue-200">
+                        <button
+                            onClick={() => setShowCallModal(true)}
+                            className="glass-button text-xs py-1 px-3 bg-blue-500/20 hover:bg-blue-500/40 border-blue-400/30 text-blue-200"
+                        >
                             <Video size={14} /> Join Call
                         </button>
                     </div>
@@ -84,6 +79,57 @@ export default function AccountabilityPartnerWidget() {
                     <button onClick={handleRunMatch} className="glass-button text-sm">
                         <RefreshCw size={16} /> Run Match Algorithm
                     </button>
+                </div>
+            )}
+
+            {/* Join Call Modal */}
+            {showCallModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCallModal(false)}>
+                    <div className="glass-panel w-full max-w-md m-4 p-0" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-5 border-b border-white/10">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Video size={20} className="text-blue-400" />
+                                Join Meeting
+                            </h3>
+                            <button onClick={() => setShowCallModal(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white cursor-pointer">
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-[2px]">
+                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${partnerData?.seed}`} alt={partnerData?.name} className="w-full h-full rounded-full bg-slate-900" />
+                                </div>
+                                <div>
+                                    <h4 className="text-white font-medium text-lg">{partnerData?.name}</h4>
+                                    <p className="text-pink-300 text-sm">{partnerData?.major}</p>
+                                </div>
+                            </div>
+
+                            <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-2 text-sm">
+                                <div className="flex items-center gap-2 text-slate-300">
+                                    <Calendar size={14} className="text-slate-400" />
+                                    <span>{partnerData?.meeting}</span>
+                                </div>
+                                <p className="text-slate-400 text-xs mt-2">This will open a video call with your accountability partner for your scheduled check-in session.</p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 border-t border-white/10 flex justify-end gap-3">
+                            <button onClick={() => setShowCallModal(false)} className="glass-button text-sm">Cancel</button>
+                            <a
+                                href="https://meet.jit.si/nexus-partner-checkin"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="glass-button text-sm bg-green-500/20 hover:bg-green-500/40 border-green-400/30 text-green-200 no-underline"
+                                onClick={() => setShowCallModal(false)}
+                            >
+                                <ExternalLink size={14} />
+                                Open Video Call
+                            </a>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

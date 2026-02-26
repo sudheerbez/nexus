@@ -70,3 +70,16 @@ class AssessmentRequest(BaseModel):
     user_id: int
     goal: str
     challenges: str
+
+class ChatRequest(BaseModel):
+    message: str
+
+class ChatResponse(BaseModel):
+    reply: str
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    major: Optional[str] = None
+    career_interest: Optional[str] = None
+
