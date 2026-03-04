@@ -1,6 +1,35 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional, List
 from .models import StageEnum
+
+# ─── Auth ────────────────────────────────────────────────
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+class GoogleAuthRequest(BaseModel):
+    credential: str  # Google ID token
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: "UserResponse"
+
+# ─── Onboarding ─────────────────────────────────────────
+
+class OnboardingRequest(BaseModel):
+    major: str
+    career_interest: str
+    goal: str
+    challenges: str
+
+# ─── Learning Path ───────────────────────────────────────
 
 class LearningPathBase(BaseModel):
     primary_goal: str
@@ -20,6 +49,8 @@ class LearningPathResponse(LearningPathBase):
     class Config:
         from_attributes = True
 
+# ─── Artifacts ───────────────────────────────────────────
+
 class ArtifactBase(BaseModel):
     title: str
     type: str
@@ -38,11 +69,13 @@ class ArtifactResponse(ArtifactBase):
     class Config:
         from_attributes = True
 
+# ─── User ────────────────────────────────────────────────
+
 class UserBase(BaseModel):
     name: str
     email: str
-    major: str
-    career_interest: str
+    major: Optional[str] = None
+    career_interest: Optional[str] = None
 
 class UserCreate(UserBase):
     pass
@@ -50,11 +83,22 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: int
     current_stage: StageEnum
+    onboarding_complete: bool = False
+    avatar_url: Optional[str] = None
+    auth_provider: str = "local"
     learning_path: Optional[LearningPathResponse] = None
     artifacts: List[ArtifactResponse] = []
 
     class Config:
         from_attributes = True
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    major: Optional[str] = None
+    career_interest: Optional[str] = None
+
+# ─── Partner Matching ────────────────────────────────────
 
 class PartnerMatchResponse(BaseModel):
     id: int
@@ -66,10 +110,19 @@ class PartnerMatchResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class MatchingSurveyCreate(BaseModel):
+    career_interests: str
+    challenges: str
+    preferred_schedule: str = "weekly"
+    learning_style: str = "hands-on"
+
+# ─── Assessment ──────────────────────────────────────────
+
 class AssessmentRequest(BaseModel):
-    user_id: int
     goal: str
     challenges: str
+
+# ─── Chat ────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
     message: str
@@ -77,9 +130,5 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     reply: str
 
-class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[str] = None
-    major: Optional[str] = None
-    career_interest: Optional[str] = None
-
+# Fix forward reference
+TokenResponse.model_rebuild()

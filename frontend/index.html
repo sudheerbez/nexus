@@ -43,6 +43,14 @@
   </noscript>
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    window.addEventListener('error', function (event) {
+      document.body.innerHTML += '<div style="background: white; color: red; padding: 20px; z-index: 9999; position: absolute; top:0; left: 0; right: 0; font-family: monospace;"><h3>Frontend Crash:</h3><pre>' + (event.error ? event.error.stack : event.message) + '</pre></div>';
+    });
+    window.addEventListener('unhandledrejection', function (event) {
+      document.body.innerHTML += '<div style="background: white; color: red; padding: 20px; z-index: 9999; position: absolute; top:0; left: 0; right: 0; font-family: monospace;"><h3>Unhandled Promise Rejection:</h3><pre>' + (event.reason ? (event.reason.stack || event.reason.message || event.reason) : 'Unknown') + '</pre></div>';
+    });
+  </script>
 </body>
 
 </html>

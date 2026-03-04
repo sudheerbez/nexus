@@ -32,7 +32,7 @@ def evaluate_artifact(content: str, artifact_type: str, current_stage: str) -> d
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-pro',
+            model='gemini-2.5-flash',
             contents=prompt,
         )
         import json

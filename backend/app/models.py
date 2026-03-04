@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Enum, ForeignKey
+from sqlalchemy import Column, Integer, String, Enum, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime, timezone
 import enum
 from .database import Base
 
@@ -14,13 +15,20 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    email = Column(String, unique=True, index=True)
-    major = Column(String)
-    career_interest = Column(String)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=True)  # Null for Google OAuth users
+    auth_provider = Column(String, default="local")  # "local" or "google"
+    google_id = Column(String, unique=True, nullable=True)
+    avatar_url = Column(String, nullable=True)
+    major = Column(String, nullable=True)
+    career_interest = Column(String, nullable=True)
     current_stage = Column(Enum(StageEnum), default=StageEnum.dependent)
+    onboarding_complete = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     learning_path = relationship("LearningPath", back_populates="user", uselist=False)
     artifacts = relationship("Artifact", back_populates="user")
+    matching_survey = relationship("MatchingSurvey", back_populates="user", uselist=False)
 
 class LearningPath(Base):
     __tablename__ = "learning_paths"
@@ -28,7 +36,7 @@ class LearningPath(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     primary_goal = Column(String)
-    identified_gaps = Column(String) # Stored as JSON string list
+    identified_gaps = Column(String)  # Stored as JSON string list
     
     # 4-stage Roadmap Details
     dependent_goal = Column(String)
@@ -44,10 +52,10 @@ class Artifact(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
     title = Column(String)
-    type = Column(String) # code, terminal, document
-    content = Column(String) # The actual code snippet or log
-    status = Column(String, default="pending") # pending, verified, rejected
-    feedback = Column(String) # Socratic feedback from Mentor Agent
+    type = Column(String)  # code, terminal, document
+    content = Column(String)
+    status = Column(String, default="pending")  # pending, verified, rejected
+    feedback = Column(String)
     date_submitted = Column(String)
 
     user = relationship("User", back_populates="artifacts")
@@ -58,5 +66,17 @@ class PartnerMatch(Base):
     id = Column(Integer, primary_key=True, index=True)
     user1_id = Column(Integer, ForeignKey("users.id"))
     user2_id = Column(Integer, ForeignKey("users.id"))
-    match_score = Column(Integer) # Percentage score
+    match_score = Column(Integer)
     next_meeting = Column(String)
+
+class MatchingSurvey(Base):
+    __tablename__ = "matching_surveys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True)
+    career_interests = Column(String)
+    challenges = Column(String)
+    preferred_schedule = Column(String)  # "weekly" or "biweekly"
+    learning_style = Column(String)  # "visual", "hands-on", "reading", "collaborative"
+
+    user = relationship("User", back_populates="matching_survey")

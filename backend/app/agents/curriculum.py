@@ -40,7 +40,7 @@ def generate_roadmap(goal: str, challenges: str) -> dict:
     
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-pro',
+            model='gemini-2.5-flash',
             contents=prompt,
         )
         

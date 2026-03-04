@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { runMatchAlgorithm } from '../../services/api';
-import { Users, Calendar, Video, RefreshCw, X, ExternalLink } from "lucide-react";
+import { runMatchAlgorithm, getMyPartner } from '../../services/api';
+import { Users, Calendar, Video, RefreshCw, X, ExternalLink, Loader2, AlertCircle } from "lucide-react";
 
 export default function AccountabilityPartnerWidget() {
     const [partnerData, setPartnerData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
     const [showCallModal, setShowCallModal] = useState(false);
 
-    const fetchPartner = () => {
+    const fetchPartner = async () => {
         setLoading(true);
-        setTimeout(() => {
-            setPartnerData(null);
+        setError('');
+        try {
+            const data = await getMyPartner();
+            setPartnerData(data.partner);
+        } catch (e) {
+            setError(e.message);
+        } finally {
             setLoading(false);
-        }, 500);
+        }
     };
 
     useEffect(() => {
@@ -21,11 +27,14 @@ export default function AccountabilityPartnerWidget() {
 
     const handleRunMatch = async () => {
         setLoading(true);
+        setError('');
         try {
-            const data = await runMatchAlgorithm();
-            setPartnerData(data);
+            const result = await runMatchAlgorithm();
+            // After matching, fetch the partner
+            const data = await getMyPartner();
+            setPartnerData(data.partner);
         } catch (e) {
-            console.error(e);
+            setError(e.message);
         } finally {
             setLoading(false);
         }
@@ -44,13 +53,13 @@ export default function AccountabilityPartnerWidget() {
 
             {loading ? (
                 <div className="flex-1 flex items-center justify-center min-h-[140px]">
-                    <RefreshCw className="animate-spin text-slate-500" size={24} />
+                    <Loader2 className="animate-spin text-slate-500" size={24} />
                 </div>
             ) : partnerData ? (
                 <div className="bg-white/5 rounded-xl p-4 border border-white/10 mt-2 flex flex-col gap-3">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-[2px]">
-                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${partnerData.seed}`} alt={partnerData.name} className="w-full h-full rounded-full bg-slate-900" />
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-lg font-bold text-white">
+                            {partnerData.name?.[0]?.toUpperCase() || 'P'}
                         </div>
                         <div>
                             <h4 className="text-white font-medium">{partnerData.name}</h4>
@@ -63,7 +72,7 @@ export default function AccountabilityPartnerWidget() {
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2 text-sm text-slate-200">
                             <Calendar size={14} className="text-slate-400" />
-                            <span>{partnerData.meeting}</span>
+                            <span>{partnerData.next_meeting}</span>
                         </div>
                         <button
                             onClick={() => setShowCallModal(true)}
@@ -75,58 +84,45 @@ export default function AccountabilityPartnerWidget() {
                 </div>
             ) : (
                 <div className="bg-white/5 rounded-xl p-6 border border-white/10 mt-2 flex flex-col items-center justify-center gap-3 min-h-[140px] text-center">
-                    <p className="text-sm text-slate-400">You have not been matched with a partner yet.</p>
+                    {error && (
+                        <p className="text-xs text-red-300 flex items-center gap-1"><AlertCircle size={12} />{error}</p>
+                    )}
+                    <p className="text-sm text-slate-400">No partner match found yet.</p>
                     <button onClick={handleRunMatch} className="glass-button text-sm">
                         <RefreshCw size={16} /> Run Match Algorithm
                     </button>
+                    <p className="text-xs text-slate-500">Requires 2+ onboarded users</p>
                 </div>
             )}
 
-            {/* Join Call Modal */}
-            {showCallModal && (
+            {/* Video Call Modal */}
+            {showCallModal && partnerData && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowCallModal(false)}>
                     <div className="glass-panel w-full max-w-md m-4 p-0" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-between p-5 border-b border-white/10">
                             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                <Video size={20} className="text-blue-400" />
-                                Join Meeting
+                                <Video size={20} className="text-blue-400" /> Join Meeting
                             </h3>
                             <button onClick={() => setShowCallModal(false)} className="p-1.5 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white cursor-pointer">
                                 <X size={18} />
                             </button>
                         </div>
-
                         <div className="p-5 space-y-4">
                             <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 p-[2px]">
-                                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${partnerData?.seed}`} alt={partnerData?.name} className="w-full h-full rounded-full bg-slate-900" />
+                                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white">
+                                    {partnerData.name?.[0]?.toUpperCase() || 'P'}
                                 </div>
                                 <div>
-                                    <h4 className="text-white font-medium text-lg">{partnerData?.name}</h4>
-                                    <p className="text-pink-300 text-sm">{partnerData?.major}</p>
+                                    <h4 className="text-white font-medium text-lg">{partnerData.name}</h4>
+                                    <p className="text-pink-300 text-sm">{partnerData.major}</p>
                                 </div>
                             </div>
-
-                            <div className="bg-black/20 p-4 rounded-xl border border-white/5 space-y-2 text-sm">
-                                <div className="flex items-center gap-2 text-slate-300">
-                                    <Calendar size={14} className="text-slate-400" />
-                                    <span>{partnerData?.meeting}</span>
-                                </div>
-                                <p className="text-slate-400 text-xs mt-2">This will open a video call with your accountability partner for your scheduled check-in session.</p>
-                            </div>
+                            <p className="text-xs text-slate-400">This will open a video call with your accountability partner.</p>
                         </div>
-
                         <div className="p-5 border-t border-white/10 flex justify-end gap-3">
                             <button onClick={() => setShowCallModal(false)} className="glass-button text-sm">Cancel</button>
-                            <a
-                                href="https://meet.jit.si/nexus-partner-checkin"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="glass-button text-sm bg-green-500/20 hover:bg-green-500/40 border-green-400/30 text-green-200 no-underline"
-                                onClick={() => setShowCallModal(false)}
-                            >
-                                <ExternalLink size={14} />
-                                Open Video Call
+                            <a href="https://meet.jit.si/nexus-partner-checkin" target="_blank" rel="noopener noreferrer" className="glass-button text-sm bg-green-500/20 hover:bg-green-500/40 border-green-400/30 text-green-200 no-underline">
+                                <ExternalLink size={14} /> Open Video Call
                             </a>
                         </div>
                     </div>
