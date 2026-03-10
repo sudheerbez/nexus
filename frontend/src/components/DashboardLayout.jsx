@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Home, Compass, User, Settings, Bell, Search, X, LogOut } from 'lucide-react';
+import { getNotifications, markAllNotificationsRead, markNotificationRead, searchAll } from '../services/api';
+import { Home, Compass, User, Settings, Bell, Search, X, LogOut, Loader2, FileCode, Users, BookOpen } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
     const navigate = useNavigate();
@@ -9,7 +10,11 @@ export default function DashboardLayout({ children }) {
     const { user, logout } = useAuth();
     const [showNotifications, setShowNotifications] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState(null);
+    const [searchLoading, setSearchLoading] = useState(false);
     const notifRef = useRef(null);
+    const searchRef = useRef(null);
+    const searchTimerRef = useRef(null);
 
     const navItems = [
         { icon: Home, label: "Home", path: "/" },
@@ -20,17 +25,97 @@ export default function DashboardLayout({ children }) {
 
     const [notifications, setNotifications] = useState([]);
 
+    // Fetch real notifications from backend
+    const fetchNotifications = useCallback(async () => {
+        try {
+            const data = await getNotifications();
+            setNotifications(data);
+        } catch {
+            // Silently fail — notifications are non-critical
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchNotifications();
+        // Poll for new notifications every 30 seconds
+        const interval = setInterval(fetchNotifications, 30000);
+        return () => clearInterval(interval);
+    }, [fetchNotifications]);
+
     useEffect(() => {
         const handler = (e) => {
             if (notifRef.current && !notifRef.current.contains(e.target)) setShowNotifications(false);
+            if (searchRef.current && !searchRef.current.contains(e.target)) setSearchResults(null);
         };
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
 
     const isActive = (path) => path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
-    const markAllRead = () => setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+
+    const markAllRead = async () => {
+        try {
+            await markAllNotificationsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, unread: false })));
+        } catch {
+            // Silently fail
+        }
+    };
+
+    const markOneRead = async (id) => {
+        try {
+            await markNotificationRead(id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, unread: false } : n));
+        } catch {
+            // Silently fail
+        }
+    };
+
     const unreadCount = notifications.filter(n => n.unread).length;
+
+    // Debounced search
+    const handleSearchChange = (value) => {
+        setSearchQuery(value);
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+        if (!value.trim()) {
+            setSearchResults(null);
+            return;
+        }
+
+        searchTimerRef.current = setTimeout(async () => {
+            setSearchLoading(true);
+            try {
+                const results = await searchAll(value.trim());
+                setSearchResults(results);
+            } catch {
+                setSearchResults(null);
+            } finally {
+                setSearchLoading(false);
+            }
+        }, 300);
+    };
+
+    const hasSearchResults = searchResults && (
+        searchResults.artifacts?.length > 0 ||
+        searchResults.learning_path_matches?.length > 0 ||
+        searchResults.peers?.length > 0
+    );
+
+    // Format notification time
+    const formatTime = (dateStr) => {
+        if (!dateStr) return '';
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diff = now - date;
+        const mins = Math.floor(diff / 60000);
+        if (mins < 1) return 'Just now';
+        if (mins < 60) return `${mins}m ago`;
+        const hours = Math.floor(mins / 60);
+        if (hours < 24) return `${hours}h ago`;
+        const days = Math.floor(hours / 24);
+        return `${days}d ago`;
+    };
 
     return (
         <div className="min-h-screen flex text-slate-100 font-sans">
@@ -63,15 +148,82 @@ export default function DashboardLayout({ children }) {
             <div className="flex-1 flex flex-col mr-4">
                 {/* Header */}
                 <header className="glass-panel mt-4 mb-4 p-4 flex justify-between items-center z-30 sticky top-4 overflow-visible">
-                    <div className="flex-1 max-w-xl hidden md:flex items-center gap-2 px-4 py-2 bg-black/20 rounded-xl border border-white/5 focus-within:border-blue-400/30 transition-colors relative z-10">
-                        <Search size={18} className="text-slate-400" />
-                        <input type="text" placeholder="Search resources, peers, or artifacts..." className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-slate-500" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <div className="flex-1 max-w-xl hidden md:flex flex-col relative z-10" ref={searchRef}>
+                        <div className="flex items-center gap-2 px-4 py-2 bg-black/20 rounded-xl border border-white/5 focus-within:border-blue-400/30 transition-colors">
+                            <Search size={18} className="text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search artifacts, resources, or peers..."
+                                className="bg-transparent border-none outline-none text-sm w-full text-white placeholder-slate-500"
+                                value={searchQuery}
+                                onChange={e => handleSearchChange(e.target.value)}
+                            />
+                            {searchLoading && <Loader2 size={14} className="animate-spin text-slate-400" />}
+                            {searchQuery && !searchLoading && (
+                                <button onClick={() => { setSearchQuery(''); setSearchResults(null); }} className="text-slate-500 hover:text-white cursor-pointer">
+                                    <X size={14} />
+                                </button>
+                            )}
+                        </div>
+                        {/* Search Results Dropdown */}
+                        {searchResults && searchQuery.trim() && (
+                            <div className="absolute top-12 left-0 right-0 bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl z-[100] max-h-80 overflow-y-auto">
+                                {!hasSearchResults ? (
+                                    <div className="p-4 text-center text-sm text-slate-400">No results found for "{searchQuery}"</div>
+                                ) : (
+                                    <div className="p-2">
+                                        {searchResults.artifacts?.length > 0 && (
+                                            <div className="mb-2">
+                                                <p className="text-[10px] uppercase tracking-wider text-slate-500 px-3 py-1">Artifacts</p>
+                                                {searchResults.artifacts.map(a => (
+                                                    <button key={a.id} onClick={() => { navigate('/discovery'); setSearchResults(null); setSearchQuery(''); }} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-lg text-left cursor-pointer">
+                                                        <FileCode size={14} className="text-blue-400 shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-white truncate">{a.title}</p>
+                                                            <p className="text-[10px] text-slate-500">{a.status} • {a.date_submitted}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {searchResults.learning_path_matches?.length > 0 && (
+                                            <div className="mb-2">
+                                                <p className="text-[10px] uppercase tracking-wider text-slate-500 px-3 py-1">Learning Path</p>
+                                                {searchResults.learning_path_matches.map((m, i) => (
+                                                    <button key={i} onClick={() => { navigate('/discovery'); setSearchResults(null); setSearchQuery(''); }} className="w-full flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-lg text-left cursor-pointer">
+                                                        <BookOpen size={14} className="text-purple-400 shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-white truncate">{m.field}</p>
+                                                            <p className="text-[10px] text-slate-400 truncate">{m.content}</p>
+                                                        </div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                        {searchResults.peers?.length > 0 && (
+                                            <div>
+                                                <p className="text-[10px] uppercase tracking-wider text-slate-500 px-3 py-1">Peers</p>
+                                                {searchResults.peers.map(p => (
+                                                    <div key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-white/5 rounded-lg">
+                                                        <Users size={14} className="text-pink-400 shrink-0" />
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm text-white truncate">{p.name}</p>
+                                                            <p className="text-[10px] text-slate-500">{p.major} • {p.career_interest}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
 
                     <div className="flex items-center gap-4 ml-auto relative z-10">
                         {/* Notifications */}
                         <div className="relative" ref={notifRef}>
-                            <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full hover:bg-white/10 transition-colors relative cursor-pointer">
+                            <button onClick={() => { setShowNotifications(!showNotifications); if (!showNotifications) fetchNotifications(); }} className="p-2 rounded-full hover:bg-white/10 transition-colors relative cursor-pointer">
                                 <Bell size={20} className="text-slate-300" />
                                 {unreadCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-pink-500 rounded-full text-[10px] flex items-center justify-center font-bold animate-pulse">{unreadCount}</span>}
                             </button>
@@ -85,17 +237,21 @@ export default function DashboardLayout({ children }) {
                                         </div>
                                     </div>
                                     <div className="max-h-64 overflow-y-auto">
-                                        {notifications.map(n => (
-                                            <div key={n.id} className={`p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer ${n.unread ? 'bg-blue-500/10' : ''}`} onClick={() => setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, unread: false } : x))}>
-                                                <div className="flex items-start gap-2">
-                                                    {n.unread && <span className="w-2 h-2 mt-1.5 bg-blue-400 rounded-full shrink-0"></span>}
-                                                    <div>
-                                                        <p className="text-sm text-slate-200">{n.text}</p>
-                                                        <p className="text-xs text-slate-500 mt-1">{n.time}</p>
+                                        {notifications.length === 0 ? (
+                                            <div className="p-6 text-center text-sm text-slate-500">No notifications yet</div>
+                                        ) : (
+                                            notifications.map(n => (
+                                                <div key={n.id} className={`p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer ${n.unread ? 'bg-blue-500/10' : ''}`} onClick={() => markOneRead(n.id)}>
+                                                    <div className="flex items-start gap-2">
+                                                        {n.unread && <span className="w-2 h-2 mt-1.5 bg-blue-400 rounded-full shrink-0"></span>}
+                                                        <div>
+                                                            <p className="text-sm text-slate-200">{n.text}</p>
+                                                            <p className="text-xs text-slate-500 mt-1">{formatTime(n.created_at)}</p>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))
+                                        )}
                                     </div>
                                 </div>
                             )}
