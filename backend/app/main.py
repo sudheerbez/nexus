@@ -5,6 +5,8 @@ from . import models, schemas, api
 from .database import engine, get_db
 from .auth import hash_password, verify_password, create_access_token, get_current_user, verify_google_token
 from .agents import curriculum
+from .agents.curriculum import CurriculumAgentError
+from datetime import datetime, timezone
 
 # Create DB tables
 models.Base.metadata.create_all(bind=engine)
@@ -131,7 +133,10 @@ def complete_onboarding(
     current_user.career_interest = req.career_interest
 
     # Generate roadmap via Curriculum Agent
-    roadmap_data = curriculum.generate_roadmap(req.goal, req.challenges)
+    try:
+        roadmap_data = curriculum.generate_roadmap(req.goal, req.challenges)
+    except CurriculumAgentError as e:
+        raise HTTPException(status_code=503, detail=str(e))
 
     # Check if learning path already exists
     existing_lp = db.query(models.LearningPath).filter(
@@ -159,6 +164,17 @@ def complete_onboarding(
 
     current_user.current_stage = models.StageEnum.dependent
     current_user.onboarding_complete = True
+
+    # Create welcome notification
+    welcome_notif = models.Notification(
+        user_id=current_user.id,
+        text="Welcome to Nexus! Your personalized learning roadmap has been generated. Start by exploring the Discovery stage.",
+        type="success",
+        unread=True,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(welcome_notif)
+
     db.commit()
     db.refresh(current_user)
     return current_user
