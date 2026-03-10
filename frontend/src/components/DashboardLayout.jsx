@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { getNotifications, markAllNotificationsRead, markNotificationRead, searchAll } from '../services/api';
 import { Home, Compass, User, Settings, Bell, Search, X, LogOut, Loader2, FileCode, Users, BookOpen } from 'lucide-react';
 
+const NOTIFICATION_POLL_INTERVAL = 30000;
+const SEARCH_DEBOUNCE_MS = 300;
+
 export default function DashboardLayout({ children }) {
     const navigate = useNavigate();
     const location = useLocation();
@@ -38,7 +41,7 @@ export default function DashboardLayout({ children }) {
     useEffect(() => {
         fetchNotifications();
         // Poll for new notifications every 30 seconds
-        const interval = setInterval(fetchNotifications, 30000);
+        const interval = setInterval(fetchNotifications, NOTIFICATION_POLL_INTERVAL);
         return () => clearInterval(interval);
     }, [fetchNotifications]);
 
@@ -93,7 +96,7 @@ export default function DashboardLayout({ children }) {
             } finally {
                 setSearchLoading(false);
             }
-        }, 300);
+        }, SEARCH_DEBOUNCE_MS);
     };
 
     const hasSearchResults = searchResults && (

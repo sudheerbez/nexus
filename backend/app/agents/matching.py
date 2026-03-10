@@ -1,5 +1,10 @@
 from typing import List, Dict
 
+# Named constants for matching algorithm
+DEFAULT_COMPATIBILITY_SCORE = 30
+STOP_WORDS = {'and', 'or', 'the', 'a', 'an', 'in', 'of', 'for', 'to', 'with'}
+
+
 def gale_shapley_match(users: List[Dict]) -> List[tuple]:
     """
     Implements a simplified Gale-Shapley stable matching algorithm.
@@ -72,16 +77,14 @@ def gale_shapley_match(users: List[Dict]) -> List[tuple]:
                 pass
 
         # Normalize to percentage (0-100)
-        return round((score / max_score) * 100) if max_score > 0 else 30
+        return round((score / max_score) * 100) if max_score > 0 else DEFAULT_COMPATIBILITY_SCORE
 
     def _has_overlap(s1, s2):
         """Check if two strings share meaningful keywords."""
         words1 = set(s1.lower().split())
         words2 = set(s2.lower().split())
-        # Remove common stop words
-        stop = {'and', 'or', 'the', 'a', 'an', 'in', 'of', 'for', 'to', 'with'}
-        words1 -= stop
-        words2 -= stop
+        words1 -= STOP_WORDS
+        words2 -= STOP_WORDS
         return len(words1 & words2) > 0
 
     def _complementary_styles(s1, s2):
