@@ -26,9 +26,15 @@ class User(Base):
     onboarding_complete = Column(Boolean, default=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    # Persisted preferences
+    pref_dark_mode = Column(Boolean, default=True)
+    pref_notifications = Column(Boolean, default=True)
+    pref_privacy = Column(Boolean, default=True)
+
     learning_path = relationship("LearningPath", back_populates="user", uselist=False)
     artifacts = relationship("Artifact", back_populates="user")
     matching_survey = relationship("MatchingSurvey", back_populates="user", uselist=False)
+    notifications = relationship("Notification", back_populates="user", order_by="Notification.created_at.desc()")
 
 class LearningPath(Base):
     __tablename__ = "learning_paths"
@@ -68,6 +74,7 @@ class PartnerMatch(Base):
     user2_id = Column(Integer, ForeignKey("users.id"))
     match_score = Column(Integer)
     next_meeting = Column(String)
+    room_id = Column(String, nullable=True)  # Unique video call room per pair
 
 class MatchingSurvey(Base):
     __tablename__ = "matching_surveys"
@@ -80,3 +87,15 @@ class MatchingSurvey(Base):
     learning_style = Column(String)  # "visual", "hands-on", "reading", "collaborative"
 
     user = relationship("User", back_populates="matching_survey")
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    text = Column(String, nullable=False)
+    type = Column(String, default="info")  # info, success, warning, stage_advance, artifact, partner
+    unread = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User", back_populates="notifications")

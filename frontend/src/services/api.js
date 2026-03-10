@@ -105,3 +105,32 @@ export async function createAssessment(goal, challenges) {
         body: JSON.stringify({ goal, challenges }),
     });
 }
+
+// ─── Notifications ──────────────────────────────────────
+
+export async function getNotifications() {
+    return apiFetch('/api/notifications');
+}
+
+export async function markAllNotificationsRead() {
+    return apiFetch('/api/notifications/read-all', { method: 'POST' });
+}
+
+export async function markNotificationRead(notificationId) {
+    return apiFetch(`/api/notifications/${notificationId}/read`, { method: 'POST' });
+}
+
+// ─── Search ─────────────────────────────────────────────
+
+export async function searchAll(query) {
+    return apiFetch(`/api/search?q=${encodeURIComponent(query)}`);
+}
+
+// ─── Preferences ────────────────────────────────────────
+
+export async function updatePreferences(prefs) {
+    return apiFetch('/api/preferences', {
+        method: 'PUT',
+        body: JSON.stringify(prefs),
+    });
+}

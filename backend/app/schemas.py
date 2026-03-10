@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
+from datetime import datetime
 from .models import StageEnum
 
 # ─── Auth ────────────────────────────────────────────────
@@ -69,6 +70,18 @@ class ArtifactResponse(ArtifactBase):
     class Config:
         from_attributes = True
 
+# ─── Notifications ───────────────────────────────────────
+
+class NotificationResponse(BaseModel):
+    id: int
+    text: str
+    type: str
+    unread: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 # ─── User ────────────────────────────────────────────────
 
 class UserBase(BaseModel):
@@ -86,6 +99,9 @@ class UserResponse(UserBase):
     onboarding_complete: bool = False
     avatar_url: Optional[str] = None
     auth_provider: str = "local"
+    pref_dark_mode: bool = True
+    pref_notifications: bool = True
+    pref_privacy: bool = True
     learning_path: Optional[LearningPathResponse] = None
     artifacts: List[ArtifactResponse] = []
 
@@ -97,6 +113,11 @@ class UserUpdate(BaseModel):
     email: Optional[str] = None
     major: Optional[str] = None
     career_interest: Optional[str] = None
+
+class UserPreferencesUpdate(BaseModel):
+    pref_dark_mode: Optional[bool] = None
+    pref_notifications: Optional[bool] = None
+    pref_privacy: Optional[bool] = None
 
 # ─── Partner Matching ────────────────────────────────────
 
@@ -129,6 +150,11 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     reply: str
+
+# ─── Search ──────────────────────────────────────────────
+
+class SearchRequest(BaseModel):
+    query: str
 
 # Fix forward reference
 TokenResponse.model_rebuild()

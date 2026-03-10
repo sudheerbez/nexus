@@ -1,17 +1,25 @@
 import os
+import json
 from google import genai
+
+
+class MentorAgentError(Exception):
+    """Raised when the Mentor Agent cannot evaluate an artifact."""
+    pass
+
 
 def evaluate_artifact(content: str, artifact_type: str, current_stage: str) -> dict:
     """
     Uses Gemini to evaluate an artifact and provide Socratic feedback.
+    Raises MentorAgentError if the API key is missing or the AI call fails.
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        # Fallback for local testing without API key
-        return {
-            "status": "verified",
-            "feedback": "Great work! This looks solid. Consider exploring edge cases next."
-        }
+        raise MentorAgentError(
+            "GEMINI_API_KEY environment variable is not configured. "
+            "The Mentor Agent requires a valid Google Gemini API key to evaluate artifacts. "
+            "Please contact your administrator."
+        )
 
     client = genai.Client(api_key=api_key)
     
@@ -22,7 +30,15 @@ def evaluate_artifact(content: str, artifact_type: str, current_stage: str) -> d
     Artifact Content:
     {content}
     
-    Evaluate the artifact focusing on encouraging independent thought rather than just giving the answer.
+    Evaluate the artifact rigorously but constructively:
+    - For "Dependent" stage: Check understanding of fundamentals, verify correct syntax and basic logic.
+    - For "Interested" stage: Look for deeper exploration, proper patterns, and evidence of curiosity.
+    - For "Involved" stage: Evaluate project integration, collaboration readiness, and applied skills.
+    - For "Self-Directed" stage: Assess architectural decisions, code quality, and independent problem-solving.
+    
+    Be honest — reject artifacts that don't meet the stage requirements. Encourage independent thought
+    rather than giving direct answers. Use Socratic questioning.
+    
     Return ONLY a valid JSON object with the following schema, do not wrap in markdown blocks:
     {{
         "status": "String, either 'verified' or 'rejected'",
@@ -35,7 +51,6 @@ def evaluate_artifact(content: str, artifact_type: str, current_stage: str) -> d
             model='gemini-2.5-flash',
             contents=prompt,
         )
-        import json
         
         text = response.text.strip()
         if text.startswith("```json"):
@@ -43,10 +58,21 @@ def evaluate_artifact(content: str, artifact_type: str, current_stage: str) -> d
         if text.endswith("```"):
             text = text[:-3]
             
-        return json.loads(text.strip())
+        result = json.loads(text.strip())
+        # Validate required fields
+        if "status" not in result or result["status"] not in ("verified", "rejected"):
+            raise ValueError("Invalid status in Mentor Agent response")
+        if "feedback" not in result:
+            raise ValueError("Missing feedback in Mentor Agent response")
+        return result
+    except json.JSONDecodeError as e:
+        raise MentorAgentError(
+            f"The Mentor Agent returned an invalid response format. Please resubmit your artifact. (Parse error: {e})"
+        )
+    except MentorAgentError:
+        raise
     except Exception as e:
-        print(f"Mentor Agent Error: {e}")
-        return {
-            "status": "verified",
-            "feedback": "System verified submission automatically. Review logs for details."
-        }
+        raise MentorAgentError(
+            f"The Mentor Agent encountered an error while evaluating your artifact: {str(e)}. "
+            "Please try again."
+        )

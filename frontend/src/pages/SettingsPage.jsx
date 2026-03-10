@@ -1,25 +1,27 @@
 import React, { useState } from 'react';
 import DashboardLayout from '../components/DashboardLayout';
 import { useAuth } from '../context/AuthContext';
-import { updateUser } from '../services/api';
+import { updateUser, updatePreferences } from '../services/api';
 import { User, Moon, Sun, Bell, Shield, Palette, Check, Loader2, LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
     const { user, logout, refreshUser } = useAuth();
-    const [darkMode, setDarkMode] = useState(true);
-    const [notifEnabled, setNotifEnabled] = useState(true);
-    const [privacy, setPrivacy] = useState(true);
+    const [darkMode, setDarkMode] = useState(user?.pref_dark_mode ?? true);
+    const [notifEnabled, setNotifEnabled] = useState(user?.pref_notifications ?? true);
+    const [privacy, setPrivacy] = useState(user?.pref_privacy ?? true);
     const [saving, setSaving] = useState(false);
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState('');
+    const [prefSaving, setPrefSaving] = useState(false);
+    const [prefSaved, setPrefSaved] = useState(false);
 
     const [name, setName] = useState(user?.name || '');
     const [email, setEmail] = useState(user?.email || '');
     const [major, setMajor] = useState(user?.major || '');
     const [careerInterest, setCareerInterest] = useState(user?.career_interest || '');
 
-    const Toggle = ({ enabled, onToggle }) => (
-        <button onClick={onToggle} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${enabled ? 'bg-blue-500' : 'bg-slate-600'}`}>
+    const Toggle = ({ enabled, onToggle, disabled }) => (
+        <button onClick={onToggle} disabled={disabled} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-50 ${enabled ? 'bg-blue-500' : 'bg-slate-600'}`}>
             <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${enabled ? 'translate-x-6' : 'translate-x-1'}`} />
         </button>
     );
@@ -35,6 +37,24 @@ export default function SettingsPage() {
             setError(e.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handlePrefToggle = async (key, newValue, setter) => {
+        setter(newValue);
+        setPrefSaving(true);
+        setPrefSaved(false);
+        try {
+            await updatePreferences({ [key]: newValue });
+            await refreshUser();
+            setPrefSaved(true);
+            setTimeout(() => setPrefSaved(false), 2000);
+        } catch (e) {
+            // Revert on failure
+            setter(!newValue);
+            setError(e.message);
+        } finally {
+            setPrefSaving(false);
         }
     };
 
@@ -86,6 +106,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-3 mb-2">
                         <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><Palette size={20} /></div>
                         <h3 className="font-semibold text-xl text-white">Preferences</h3>
+                        {prefSaved && <span className="ml-auto text-xs text-green-400 flex items-center gap-1"><Check size={12} /> Saved</span>}
                     </div>
                     <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
@@ -95,7 +116,7 @@ export default function SettingsPage() {
                                 <p className="text-xs text-slate-400">Use dark theme across the application</p>
                             </div>
                         </div>
-                        <Toggle enabled={darkMode} onToggle={() => setDarkMode(!darkMode)} />
+                        <Toggle enabled={darkMode} onToggle={() => handlePrefToggle('pref_dark_mode', !darkMode, setDarkMode)} disabled={prefSaving} />
                     </div>
                     <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
@@ -105,7 +126,7 @@ export default function SettingsPage() {
                                 <p className="text-xs text-slate-400">Receive alerts for feedback and meetings</p>
                             </div>
                         </div>
-                        <Toggle enabled={notifEnabled} onToggle={() => setNotifEnabled(!notifEnabled)} />
+                        <Toggle enabled={notifEnabled} onToggle={() => handlePrefToggle('pref_notifications', !notifEnabled, setNotifEnabled)} disabled={prefSaving} />
                     </div>
                     <div className="flex items-center justify-between p-3 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex items-center gap-3">
@@ -115,7 +136,7 @@ export default function SettingsPage() {
                                 <p className="text-xs text-slate-400">Profile visible to accountability partners only</p>
                             </div>
                         </div>
-                        <Toggle enabled={privacy} onToggle={() => setPrivacy(!privacy)} />
+                        <Toggle enabled={privacy} onToggle={() => handlePrefToggle('pref_privacy', !privacy, setPrivacy)} disabled={prefSaving} />
                     </div>
                 </div>
 

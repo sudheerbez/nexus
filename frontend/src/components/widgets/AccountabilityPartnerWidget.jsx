@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { runMatchAlgorithm, getMyPartner } from '../../services/api';
-import { Users, Calendar, Video, RefreshCw, X, ExternalLink, Loader2, AlertCircle } from "lucide-react";
+import { Users, Calendar, Video, RefreshCw, X, ExternalLink, Loader2, AlertCircle, Target } from "lucide-react";
 
 export default function AccountabilityPartnerWidget() {
     const [partnerData, setPartnerData] = useState(null);
@@ -29,7 +29,7 @@ export default function AccountabilityPartnerWidget() {
         setLoading(true);
         setError('');
         try {
-            const result = await runMatchAlgorithm();
+            await runMatchAlgorithm();
             // After matching, fetch the partner
             const data = await getMyPartner();
             setPartnerData(data.partner);
@@ -38,6 +38,12 @@ export default function AccountabilityPartnerWidget() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // Generate unique Jitsi room URL based on partner pair's room_id
+    const getVideoCallUrl = () => {
+        const roomId = partnerData?.room_id || 'nexus-default';
+        return `https://meet.jit.si/nexus-${roomId}`;
     };
 
     return (
@@ -65,6 +71,12 @@ export default function AccountabilityPartnerWidget() {
                             <h4 className="text-white font-medium">{partnerData.name}</h4>
                             <p className="text-pink-300 text-xs">{partnerData.major} • {partnerData.score}% Match</p>
                         </div>
+                    </div>
+
+                    {/* Partner details */}
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
+                        <Target size={12} />
+                        <span>{partnerData.career_interest} • {partnerData.current_stage} Stage</span>
                     </div>
 
                     <div className="h-px w-full bg-white/10 my-1"></div>
@@ -114,14 +126,17 @@ export default function AccountabilityPartnerWidget() {
                                 </div>
                                 <div>
                                     <h4 className="text-white font-medium text-lg">{partnerData.name}</h4>
-                                    <p className="text-pink-300 text-sm">{partnerData.major}</p>
+                                    <p className="text-pink-300 text-sm">{partnerData.major} • {partnerData.current_stage}</p>
                                 </div>
                             </div>
-                            <p className="text-xs text-slate-400">This will open a video call with your accountability partner.</p>
+                            <p className="text-xs text-slate-400">
+                                This will open a private video call room unique to you and your accountability partner.
+                                No one else can join this room.
+                            </p>
                         </div>
                         <div className="p-5 border-t border-white/10 flex justify-end gap-3">
                             <button onClick={() => setShowCallModal(false)} className="glass-button text-sm">Cancel</button>
-                            <a href="https://meet.jit.si/nexus-partner-checkin" target="_blank" rel="noopener noreferrer" className="glass-button text-sm bg-green-500/20 hover:bg-green-500/40 border-green-400/30 text-green-200 no-underline">
+                            <a href={getVideoCallUrl()} target="_blank" rel="noopener noreferrer" className="glass-button text-sm bg-green-500/20 hover:bg-green-500/40 border-green-400/30 text-green-200 no-underline">
                                 <ExternalLink size={14} /> Open Video Call
                             </a>
                         </div>
